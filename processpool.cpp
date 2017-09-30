@@ -12,9 +12,12 @@
 #include"response.h"
 #include<cstdio>
 using namespace std;
+//externals
 extern module**modules;
 extern int module_num;
-processpool::processpool(int listenfd,int processnum):listenfd(listenfd),processnum(processnum),idx(-1){
+
+processpool::processpool(int listenfd,int processnum):listenfd(listenfd),processnum(processnum),idx(-1)
+{
 	subprocess=new process[processnum];
 	for(int i=0;i<processnum;i++){
 		if(pipe(subprocess[i].pipefd)<0){cout<<"pipe num "<<"i"<<" error"<<endl;}
@@ -25,7 +28,8 @@ processpool::processpool(int listenfd,int processnum):listenfd(listenfd),process
 	}
 }
 processpool*processpool::get(int listenfd){
-	if(pool==NULL){
+	if(pool==NULL)
+	{
 		pool=new processpool(listenfd);
 	}
 	return pool;
@@ -38,43 +42,69 @@ void processpool::run(){
 	runparent();
 }
 void processpool::runchild(){
-	while(1){
-		int b;int*buf=&b;
+	while(1)
+	{
+	//most important part
+		int b;
+		int*buf=&b;
 		read(subprocess[idx].pipefd[0],buf,sizeof(int));
-		if(*buf==idx){
+		if(*buf==idx)
+		{
 			struct sockaddr_in clientaddr;
 			unsigned int len=sizeof(clientaddr);
 			int newsock=accept(listenfd,reinterpret_cast<sockaddr*>(&clientaddr),&len);
-			if(newsock<0){cout<<"accept error"<<endl;}
-			else{cout<<"Accept success and child process No."<<idx<<" is working."<<endl;}
+			if(newsock<0)
+			{
+				cout<<"[processpool]accept error"<<endl;
+			}
+			else
+			{
+				cout<<"[processpool]Child process No."<<idx<<" is working."<<endl;
+			}
 			char head[1024];
-			memset(head,'\0',1024*sizeof(char));
+			for(int i=0;i<1024;i++)
+				head[i]='\0';
+			//cope with head
+
 			read(newsock,head,1024);
-			char method[10];
-			memset(method,'\0',10*sizeof(char));
+
+			char method[100];
+			for(int i=0;i<100;i++)
+				method[i]='\0';
+
 			char url[100];
-			memset(url,'\0',100*sizeof(char));
+			for(int i=0;i<100;i++)
+				url[i]='\0';
+			//GET Method and url from head
 			sscanf(head,"%s %s",method,url);
+			//Get rid of "/" before url
 			strcpy(url,url+1);
+
 			response*res=new response();
-			bool ok=false;
-			for(int i=0;i<module_num;i++){
-				if(strcmp(modules[i]->name,url)==0){
-					ok=true;
+			bool flag=false;//modules
+			for(int i=0;i<module_num;i++)
+			{
+				if(strcmp(modules[i]->name,url)==0)//same
+				{
 					modules[i]->command(res);
+					flag=true;
 				}
 			}
-			if(!ok){
+			if(!flag)//other pages
+			{
 				FILE*fd;
-				if(strcmp("index.html",url)==0){
+				if(strcmp("index.html",url)==0)
+				{
 					fd=fopen("index.html","r");
 				}
-				else{
+				else
+				{
 					fd=fopen("error.html","r");
 				}
 				fread(res->body,1,4096,fd);
 				fclose(fd);
 			}
+			//HTML 
 			char sen[4096];
 			sprintf(sen,"HTTP/1.1 200 OK\r\n");
 			sprintf(sen,"%sServer:myserver\r\n",sen);
